@@ -13,6 +13,10 @@
           text-align: center;
           text-decoration: none;
       }
+      .full-height {
+        height: 100vh;
+        height: calc(var(--vh, 1vh) * 100);
+      }
     </style>
   </head>
   <body>
@@ -40,11 +44,12 @@
         import { getRandomNotes, getNoteName } from './app.js';
 
         let sounds = {};
-
+        let intervals = [];
         let notes;
 
         function playNote(number) {
           const audio = sounds[number];
+          if (!audio) console.log(number, sounds)
           if (audio.paused) audio.play();
           else audio.currentTime = 0;
         }
@@ -80,6 +85,7 @@
             icon.classList.remove('bi-caret-right-fill');
             icon.classList.add('bi-music-note-beamed');
             button.disabled = true;
+            intervals.forEach(i => clearInterval(i));
           }
           button.style.visibility = 'visible';
         }
@@ -88,16 +94,18 @@
           setPlayButton('disabled');
           displayHint(notes[0]);
           notes.forEach((n, i) => {
-            setTimeout(() => {
+            const interval = setTimeout(() => {
               playNote(n);
               if (i === notes.length - 1) {
                 setPlayButton('enabled');
               }
             }, i*1000);
+            intervals.push(interval);
           });
         }
 
         async function init() {
+          setPlayButton('disabled');
           document.getElementById('hint').style.visibility = 'hidden';
           document.getElementById('play').style.visibility = 'hidden';
           notes = getRandomNotes(4);
@@ -122,7 +130,7 @@
           document.addEventListener('touchstart', e => {
             startX = e.touches[0].clientX;
           });
-          document.addEventListener('touchend', e => {
+          document.addEventListener('touchmove', e => {
             if (startX) {
               const currentX = e.touches[0].clientX;
               const deltaX = currentX - startX;
@@ -131,6 +139,9 @@
                 startX = null;
               }
             }
+          });
+          document.addEventListener('touchend', e => {
+            startX = null;
           });
 
           // mouse events
@@ -149,6 +160,15 @@
           })
         })();
 
+        function setVH() {
+          // First we get the viewport height and we multiple it by 1% to get a value for a vh unit
+          const vh = window.innerHeight * 0.01;
+          // Then we set the value in the --vh custom property to the root of the document
+          document.documentElement.style.setProperty('--vh', `${vh}px`);
+        }
+
+        setVH();
+        window.addEventListener('resize', setVH);
     </script>
 
     <!--
