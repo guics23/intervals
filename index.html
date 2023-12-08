@@ -69,10 +69,31 @@
           h.querySelector('span').textContent = txt;
         }
 
+        function setPlayButton(mode) {
+          const button = document.getElementById('play');
+          const icon = button.querySelector('i');
+          if (mode === 'enabled') {
+            icon.classList.remove('bi-music-note-beamed');
+            icon.classList.add('bi-caret-right-fill');
+            button.disabled = false;
+          } else {
+            icon.classList.remove('bi-caret-right-fill');
+            icon.classList.add('bi-music-note-beamed');
+            button.disabled = true;
+          }
+          button.style.visibility = 'visible';
+        }
+
         function play() {
+          setPlayButton('disabled');
           displayHint(notes[0]);
           notes.forEach((n, i) => {
-            setTimeout(() => playNote(n), i*1000);
+            setTimeout(() => {
+              playNote(n);
+              if (i === notes.length - 1) {
+                setPlayButton('enabled');
+              }
+            }, i*1000);
           });
         }
 
@@ -80,7 +101,9 @@
           document.getElementById('hint').style.visibility = 'hidden';
           document.getElementById('play').style.visibility = 'hidden';
           notes = getRandomNotes(4);
-          loadAudio(notes).then(() => { document.getElementById('play').style.visibility = 'visible'; });
+          loadAudio(notes).then(() => {
+            setPlayButton('enabled');
+          });
         }
 
         (async function () {
@@ -89,6 +112,42 @@
 
         document.getElementById('play').addEventListener('click', play);
         document.getElementById('refresh').addEventListener('click', init);
+
+
+        (function() {
+          const threshold = 75;
+          let startX;
+
+          // touch events
+          document.addEventListener('touchstart', e => {
+            startX = e.touches[0].clientX;
+          });
+          document.addEventListener('touchend', e => {
+            if (startX) {
+              const currentX = e.touches[0].clientX;
+              const deltaX = currentX - startX;
+              if (Math.abs(deltaX) > threshold) {
+                init();
+                startX = null;
+              }
+            }
+          });
+
+          // mouse events
+          document.addEventListener('mousedown', e => {
+            startX = e.clientX;
+          });
+          document.addEventListener('mouseup', e => {
+            if (startX) {
+              const currentX = e.clientX;
+              const deltaX = currentX - startX;
+              if (Math.abs(deltaX) > threshold) {
+                init();
+                startX = null;
+              }
+            }
+          })
+        })();
 
     </script>
 
