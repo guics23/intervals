@@ -135,7 +135,7 @@
               const currentX = e.touches[0].clientX;
               const deltaX = currentX - startX;
               if (Math.abs(deltaX) > threshold) {
-                init();
+                swiped(deltaX);
                 startX = null;
               }
             }
@@ -153,11 +153,21 @@
               const currentX = e.clientX;
               const deltaX = currentX - startX;
               if (Math.abs(deltaX) > threshold) {
-                init();
+                swiped(deltaX);
                 startX = null;
               }
             }
           })
+
+          function swiped(deltaX) {
+            if (deltaX > 0) { // swiped left: replay
+              const btn = document.getElementById('play');
+              if (btn.disabled) return;
+              btn.click();
+            } else {  // swiped right: refresh
+              init();
+            }
+          }
         })();
 
         function setVH() {
