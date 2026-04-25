@@ -54,7 +54,7 @@
     display: flex;
     align-items: center;
     gap: 0.4rem;
-    padding: 0.6rem 0.75rem;
+    padding: max(0.6rem, env(safe-area-inset-top)) max(0.75rem, env(safe-area-inset-right)) 0.6rem max(0.75rem, env(safe-area-inset-left));
     border-bottom: 1px solid #222;
   }
 
