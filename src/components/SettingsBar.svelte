@@ -1,12 +1,19 @@
 <script>
   import TonicPicker from './TonicPicker.svelte';
+  import { playChord } from '../audio/player.js';
+  import { tonicTriadMidi } from '../music/theory.js';
 
-  let { settings, progress, onSkip } = $props();
+  let { settings, onSkip } = $props();
 
   let pickerOpen = $state(false);
 
   function toggleMode() {
-    settings.mode = settings.mode === 'silent' ? 'aural' : 'silent';
+    const becomingAural = settings.mode === 'silent';
+    settings.mode = becomingAural ? 'aural' : 'silent';
+    if (becomingAural) {
+      // Synchronous play() inside the click handler unlocks iOS audio.
+      playChord(tonicTriadMidi(settings.tonic));
+    }
   }
 
   function toggleScale() {
@@ -30,7 +37,7 @@
   {#if settings.mode === 'aural' && settings.scale === 'chromatic'}
     <button class="pill" onclick={cycleLength}>{settings.length}</button>
   {/if}
-  <span class="progress">{progress}/10</span>
+  <span class="progress">{settings.progress}/10</span>
   <button class="pill skip" onclick={onSkip} aria-label="skip round">↻</button>
 </header>
 

@@ -10,10 +10,12 @@
     DEGREE_OFFSET,
     placeMidi,
     tonicTriadMidi,
+    nextKey,
   } from './music/theory.js';
   import { play, playChord, preload } from './audio/player.js';
 
   let roundSeed = $state(0);
+  let winTimer = null;
 
   const effectiveLength = $derived(
     settings.mode === 'aural' && settings.scale === 'chromatic' ? settings.length : 3
@@ -34,6 +36,10 @@
   $effect(() => {
     void round;
     placements = round.labels.map(() => null);
+    if (winTimer !== null) {
+      clearTimeout(winTimer);
+      winTimer = null;
+    }
   });
 
   $effect(() => {
@@ -41,12 +47,45 @@
     persist();
   });
 
-  // Warm up the audio elements as soon as we're in aural mode or pick a round.
+  // Preload current and next key's chord plus the round's notes so
+  // the auto-advance chord plays without a fetch delay.
   $effect(() => {
     if (settings.mode !== 'aural') return;
-    const toLoad = [...tonicTriadMidi(settings.tonic)];
+    const toLoad = [
+      ...tonicTriadMidi(settings.tonic),
+      ...tonicTriadMidi(nextKey(settings.tonic)),
+    ];
     if (round.midis) toLoad.push(...round.midis);
     preload(toLoad);
+  });
+
+  // Auto-preview: when a new aural round arrives, play its notes from the
+  // bottom slot to the top slot so the user can try to name them by ear
+  // without tapping anything. The leading delay leaves room for the I chord
+  // when this round-change happens to coincide with a key change.
+  $effect(() => {
+    if (settings.mode !== 'aural' || !round.midis) return;
+    const fromBottom = [...round.midis].reverse();
+    const startDelay = 800;
+    const gap = 450;
+    const timers = fromBottom.map((m, i) =>
+      setTimeout(() => play(m), startDelay + i * gap)
+    );
+    return () => {
+      for (const t of timers) clearTimeout(t);
+    };
+  });
+
+  // Whenever the tonic changes (manual pick or auto-advance), reset
+  // progress and play the new key's I chord in aural mode.
+  let lastTonic = settings.tonic;
+  $effect(() => {
+    if (settings.tonic === lastTonic) return;
+    lastTonic = settings.tonic;
+    settings.progress = 0;
+    if (settings.mode === 'aural') {
+      playChord(tonicTriadMidi(settings.tonic));
+    }
   });
 
   const allPlaced = $derived(
@@ -63,7 +102,22 @@
     if (settings.mode === 'aural' && round.midis) {
       play(round.midis[i]);
     }
+    if (placements.every((p) => p !== null)) onWin();
     return true;
+  }
+
+  function onWin() {
+    const newProgress = settings.progress + 1;
+    settings.progress = newProgress;
+    if (winTimer !== null) clearTimeout(winTimer);
+    winTimer = setTimeout(() => {
+      winTimer = null;
+      if (newProgress >= 10) {
+        settings.tonic = nextKey(settings.tonic);
+      } else {
+        roundSeed++;
+      }
+    }, 700);
   }
 
   function onSlotTap(i) {
@@ -72,15 +126,11 @@
     }
   }
 
-  $effect(() => {
-    if (!allPlaced) return;
-    const t = setTimeout(() => {
-      roundSeed++;
-    }, 700);
-    return () => clearTimeout(t);
-  });
-
   function skip() {
+    if (winTimer !== null) {
+      clearTimeout(winTimer);
+      winTimer = null;
+    }
     roundSeed++;
   }
 
@@ -89,11 +139,7 @@
   }
 </script>
 
-<SettingsBar
-  {settings}
-  progress={0}
-  onSkip={skip}
-/>
+<SettingsBar {settings} onSkip={skip} />
 <Slots
   labels={round.labels}
   mode={settings.mode}
