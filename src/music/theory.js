@@ -52,20 +52,38 @@ export function noteFor(key, label) {
   return SPELLINGS[key][label];
 }
 
-// Build the bottom-area pool: the round's correct notes plus distractors.
-// Diatonic: returns the 7 scale notes in scale order (always contains the answers).
-// Chromatic: returns 8 notes — the correct ones plus enough distractors, shuffled.
+// Pitch class (0..11) for a spelled note name (handles single and double accidentals).
+const LETTER_PC = { C: 0, D: 2, E: 4, F: 5, G: 7, A: 9, B: 11 };
+export function noteToPitchClass(name) {
+  let pc = LETTER_PC[name[0]];
+  for (let i = 1; i < name.length; i++) {
+    if (name[i] === '#') pc++;
+    else if (name[i] === 'b') pc--;
+  }
+  return ((pc % 12) + 12) % 12;
+}
+
+// Build the bottom-area pool: the round's correct notes plus the tonic plus distractors,
+// always ordered starting from the tonic and ascending by pitch class.
+// Diatonic: returns the 7 scale notes in scale order (already tonic-first ascending).
+// Chromatic: returns 8 notes — tonic, correct, and enough distractors to fill, sorted.
 export function buildPool(key, mode, roundLabels) {
   if (mode === 'diatonic') {
     return DIATONIC_LABELS.map(l => SPELLINGS[key][l]);
   }
+  const tonic = SPELLINGS[key]['1'];
   const correct = roundLabels.map(l => SPELLINGS[key][l]);
-  const allChromatic = CHROMATIC_LABELS.map(l => SPELLINGS[key][l]);
-  const palette = Array.from(new Set(allChromatic));
-  const distractors = palette.filter(n => !correct.includes(n));
-  const need = 8 - correct.length;
-  const picked = shuffle(distractors).slice(0, need);
-  return shuffle([...correct, ...picked]);
+  const required = Array.from(new Set([tonic, ...correct]));
+  const palette = Array.from(new Set(CHROMATIC_LABELS.map(l => SPELLINGS[key][l])));
+  const distractors = palette.filter(n => !required.includes(n));
+  const picked = shuffle(distractors).slice(0, 8 - required.length);
+  const all = [...required, ...picked];
+  const tonicPc = TONIC_PC[key];
+  return all.sort((a, b) => {
+    const offA = ((noteToPitchClass(a) - tonicPc) % 12 + 12) % 12;
+    const offB = ((noteToPitchClass(b) - tonicPc) % 12 + 12) % 12;
+    return offA - offB;
+  });
 }
 
 // MIDI 60 = C4 (middle C). Tonic MIDI in octave o = TONIC_PC[key] + 12*(o+1).
@@ -75,10 +93,22 @@ export function midiFor(key, label, tonicOctave) {
 }
 
 // Place each round label at a MIDI number within a 2-octave window above the tonic.
-// Tonic octave is randomized in {3, 4} so ranges stay within the available samples (30..90).
+// Picks a tonic octave such that every note in the round (including a possible
+// +12 shift) lands inside the available sample range [30, 90]; the random shift
+// keeps placements interesting. Octaves 3–4 are preferred for musicality but the
+// algorithm falls back to whichever octaves keep the round in range.
 export function placeMidi(key, roundLabels) {
-  const tonicOctave = 3 + Math.floor(Math.random() * 2);
-  return roundLabels.map(label => {
+  const tonicPc = TONIC_PC[key];
+  const maxOffset = Math.max(...roundLabels.map((l) => DEGREE_OFFSET[l]));
+  const valid = [];
+  for (let o = 1; o <= 6; o++) {
+    const tm = tonicPc + 12 * (o + 1);
+    if (tm >= 30 && tm + maxOffset + 12 <= 90) valid.push(o);
+  }
+  const preferred = valid.filter((o) => o === 3 || o === 4);
+  const choices = preferred.length ? preferred : valid;
+  const tonicOctave = choices[Math.floor(Math.random() * choices.length)];
+  return roundLabels.map((label) => {
     const base = midiFor(key, label, tonicOctave);
     const shift = Math.random() < 0.5 ? 0 : 12;
     return base + shift;

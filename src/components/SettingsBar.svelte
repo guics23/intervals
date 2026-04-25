@@ -27,7 +27,7 @@
   <button class="pill prominent" onclick={() => (pickerOpen = true)}>{settings.tonic}</button>
   <button class="pill" onclick={toggleMode}>{settings.mode}</button>
   <button class="pill" onclick={toggleScale}>{settings.scale}</button>
-  {#if settings.mode === 'aural'}
+  {#if settings.mode === 'aural' && settings.scale === 'chromatic'}
     <button class="pill" onclick={cycleLength}>{settings.length}</button>
   {/if}
   <span class="progress">{progress}/10</span>
