@@ -16,6 +16,8 @@
 
   let roundSeed = $state(0);
   let winTimer = null;
+  let keyChange = $state(null);
+  let countdownInterval = null;
 
   const effectiveLength = $derived(
     settings.mode === 'aural' && settings.scale === 'chromatic' ? settings.length : 3
@@ -83,6 +85,7 @@
     if (settings.tonic === lastTonic) return;
     lastTonic = settings.tonic;
     settings.progress = 0;
+    clearKeyChange();
     if (settings.mode === 'aural') {
       playChord(tonicTriadMidi(settings.tonic));
     }
@@ -113,11 +116,37 @@
     winTimer = setTimeout(() => {
       winTimer = null;
       if (newProgress >= 10) {
-        settings.tonic = nextKey(settings.tonic);
+        startKeyChangeCountdown();
       } else {
         roundSeed++;
       }
     }, 700);
+  }
+
+  function clearKeyChange() {
+    if (countdownInterval !== null) {
+      clearInterval(countdownInterval);
+      countdownInterval = null;
+    }
+    keyChange = null;
+  }
+
+  function startKeyChangeCountdown() {
+    keyChange = { nextKey: nextKey(settings.tonic), secondsLeft: 5 };
+    countdownInterval = setInterval(() => {
+      keyChange.secondsLeft--;
+      if (keyChange.secondsLeft <= 0) {
+        const nk = keyChange.nextKey;
+        clearKeyChange();
+        settings.tonic = nk;
+      }
+    }, 1000);
+  }
+
+  function stayInCurrentKey() {
+    clearKeyChange();
+    settings.progress = 0;
+    roundSeed++;
   }
 
   function onSlotTap(i) {
@@ -127,6 +156,10 @@
   }
 
   function skip() {
+    if (keyChange !== null) {
+      stayInCurrentKey();
+      return;
+    }
     if (winTimer !== null) {
       clearTimeout(winTimer);
       winTimer = null;
@@ -150,3 +183,55 @@
   onPlayChord={playTonicChord}
 />
 <Pool pool={round.pool} placed={placements} onTap={tryPlace} />
+
+{#if keyChange}
+  <div class="key-change-backdrop" role="dialog" aria-modal="true">
+    <div class="key-change-card">
+      <span>Moving to <strong>{keyChange.nextKey}</strong> in {keyChange.secondsLeft}…</span>
+      <button type="button" onclick={stayInCurrentKey}>Stay on {settings.tonic}</button>
+    </div>
+  </div>
+{/if}
+
+<style>
+  .key-change-backdrop {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.6);
+    backdrop-filter: blur(2px);
+    z-index: 100;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 1rem;
+  }
+
+  .key-change-card {
+    background: #1f1f1f;
+    border: 1px solid #333;
+    border-radius: 1rem;
+    padding: 1.25rem 1.5rem;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 1rem;
+    font-size: 1rem;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.6);
+    text-align: center;
+  }
+
+  .key-change-card button {
+    background: #2a2a2a;
+    color: var(--fg);
+    border: 1px solid #444;
+    border-radius: 999px;
+    padding: 0.5rem 1rem;
+    font: inherit;
+    font-size: 0.95rem;
+    cursor: pointer;
+  }
+
+  .key-change-card button:active {
+    background: #333;
+  }
+</style>
