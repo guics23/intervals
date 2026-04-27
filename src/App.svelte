@@ -25,11 +25,17 @@
 
   const round = $derived.by(() => {
     void roundSeed;
-    const labels = pickRoundDegrees(effectiveLength, settings.scale)
-      .sort((a, b) => DEGREE_OFFSET[b] - DEGREE_OFFSET[a]);
+    let labels = pickRoundDegrees(effectiveLength, settings.scale);
+    let midis = settings.mode === 'aural' ? placeMidi(settings.tonic, labels) : null;
+    if (midis) {
+      const order = midis.map((_, i) => i).sort((a, b) => midis[b] - midis[a]);
+      labels = order.map((i) => labels[i]);
+      midis = order.map((i) => midis[i]);
+    } else {
+      labels = labels.sort((a, b) => DEGREE_OFFSET[b] - DEGREE_OFFSET[a]);
+    }
     const pool = buildPool(settings.tonic, settings.scale, labels);
     const correctNotes = labels.map((l) => noteFor(settings.tonic, l));
-    const midis = settings.mode === 'aural' ? placeMidi(settings.tonic, labels) : null;
     return { labels, pool, correctNotes, midis };
   });
 
